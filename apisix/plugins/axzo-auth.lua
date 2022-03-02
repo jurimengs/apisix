@@ -130,31 +130,15 @@ local function extract_auth_header(authorization)
         --return nil, "none user"
     end
 
-    --local matcher, err = lrucache(authorization, nil, do_extract, authorization)
-    --if matcher then
-    --    return matcher.username, err
-    --else
-    --    return "",  err
-    --end
-
-end
-
-local create_consume_cache
-do
-    local consumer_names = {}
-
-    function create_consume_cache(consumers)
-        core.table.clear(consumer_names)
-
-        for _, cur_consumer in ipairs(consumers.nodes) do
-            core.log.info("consumer node: ",
-                    core.json.delay_encode(cur_consumer))
-            consumer_names[cur_consumer.auth_conf.username] = cur_consumer
-        end
-
-        return consumer_names
+    local matcher, err = lrucache(authorization, nil, do_extract, authorization)
+    if matcher then
+        return matcher.username, err
+    else
+        return "none user",  err
     end
+
 end
+
 
 function _M.rewrite(conf, ctx)
     core.log.info("plugin access phase, conf: ", core.json.delay_encode(conf))
@@ -174,71 +158,6 @@ function _M.rewrite(conf, ctx)
     --core.request.charset = "UTF-8"
     core.request.set_header(ctx, "username", username)
     core.log.info("hit axzo-auth access")
-end
-
-
--- 支持 https
--- endpoint_addr: http://xxx/path or https://
-
-local function send_http_data(conf, log_message)
-    local err_msg
-    local res = true
-    local url_decoded = url.parse(conf.endpoint_addr)
-    local host = url_decoded.host
-    local port = url_decoded.port
-
-    core.log.info("sending a batch logs to ", conf.endpoint_addr)
-
-    if not port then
-        if url_decoded.scheme == "https" then
-            port = 443
-        else
-            port = 80
-        end
-    end
-
-    local httpc = http.new()
-    httpc:set_timeout(conf.timeout * 1000)
-    local ok, err = httpc:connect(host, port)
-
-    if not ok then
-        return false, "failed to connect to host[" .. host .. "] port["
-                .. tostring(port) .. "] " .. err
-    end
-
-    if url_decoded.scheme == "https" then
-        ok, err = httpc:ssl_handshake(true, host, conf.ssl_verify)
-        if not ok then
-            return false, "failed to perform SSL with host[" .. host .. "] "
-                    .. "port[" .. tostring(port) .. "] " .. err
-        end
-    end
-
-    local httpc_res, httpc_err = httpc:request({
-        method = "POST",
-        path = url_decoded.path,
-        query = url_decoded.query,
-        body = "INSERT INTO " .. conf.logtable .." FORMAT JSONEachRow " .. log_message,
-        headers = {
-            ["Host"] = url_decoded.host,
-            ["Content-Type"] = "application/json;charset=UTF-8",
-        }
-    })
-
-    if not httpc_res then
-        return false, "error while sending data to [" .. host .. "] port["
-                .. tostring(port) .. "] " .. httpc_err
-    end
-
-    -- some error occurred in the server
-    if httpc_res.status >= 400 then
-        res =  false
-        err_msg = "server returned status code[" .. httpc_res.status .. "] host["
-                .. host .. "] port[" .. tostring(port) .. "] "
-                .. "body[" .. httpc_res:read_body() .. "]"
-    end
-
-    return res, err_msg
 end
 
 return _M
