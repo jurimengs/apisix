@@ -115,14 +115,9 @@ local function extract_auth_header(authorization)
         end
 
         local jsonbody = core.json.decode(res.body);
-        -- 可以拿到 user 信息了
-        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.nickname // 中文会报错
-        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.acctId
-        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.id
 
         local obj = { username = "" }
-        --obj.username = base64_encode(jsonbody.data.nickname)
-        obj.username = base64_encode("中")
+        obj.username = base64_encode(jsonbody.data.realName)
         return obj, nil
     end
 
