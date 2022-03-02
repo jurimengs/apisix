@@ -78,7 +78,7 @@ end
 local function extract_auth_header(authorization)
 
     local function do_extract(auth)
-        local obj = { username = "", password = "" }
+
 
         local decoded = auth
 
@@ -113,24 +113,32 @@ local function extract_auth_header(authorization)
             return nil, "axzo-auth: response : " .. res
         end
 
+        local jsonbody = core.json.decode(res.body);
         -- 可以拿到 user 信息了
-        obj.username = res.body.data.realName
-        obj.phoneNumber = res.body.data.phoneNumber
-        obj.id = res.body.data.id
-        core.log.info("plugin access phase, authorization: ",
-                obj.username)
-        --return nil, "axzo-auth: userinfo : " .. res.body
+        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.nickname // 中文会报错
+        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.acctId
+        --return nil, "axzo-auth: userinfo : " .. jsonbody.data.id
 
+        local obj = { username = "" }
+        obj.username = jsonbody.data.id
         return obj, nil
     end
 
-    local matcher, err = lrucache(authorization, nil, do_extract, authorization)
-
-    if matcher then
-        return matcher.username, err
+    local obj, err = do_extract(authorization)
+    if obj then
+        return obj.username, err
+        --return nil, obj.username
     else
-        return "",  err
+        return "none user", err
+        --return nil, "none user"
     end
+
+    --local matcher, err = lrucache(authorization, nil, do_extract, authorization)
+    --if matcher then
+    --    return matcher.username, err
+    --else
+    --    return "",  err
+    --end
 
 end
 
@@ -167,6 +175,7 @@ function _M.rewrite(conf, ctx)
     end
 
     core.request.set_header(ctx, "username", username)
+    core.response.set_header("username", username)
     core.log.info("hit axzo-auth access")
 end
 
