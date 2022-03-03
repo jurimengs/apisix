@@ -121,14 +121,14 @@ local function extract_auth_header(authorization)
         return obj, nil
     end
 
-    local obj, err = do_extract(authorization)
-    if obj then
-        return obj.username, err
-        --return nil, obj.username
-    else
-        return "none user", err
-        --return nil, "none user"
-    end
+    --local obj, err = do_extract(authorization)
+    --if obj then
+    --    return obj.username, err
+    --    --return nil, obj.username
+    --else
+    --    return "none user", err
+    --    --return nil, "none user"
+    --end
 
     local matcher, err = lrucache(authorization, nil, do_extract, authorization)
     if matcher then
