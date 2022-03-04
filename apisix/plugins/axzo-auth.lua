@@ -92,7 +92,6 @@ local function extract_auth_header(authorization)
         if not authurl then
             return nil, "axzo-auth: config authurl first "
         end
-        --local authurl = "http://test-api.axzo.cn/pudge/webApi/cms/user/info"
 
         local res, err = httpc:request_uri(authurl, {
             method = "GET",
@@ -114,25 +113,17 @@ local function extract_auth_header(authorization)
             return nil, "axzo-auth: response : " .. res
         end
 
-        local jsonbody = core.json.decode(res.body);
+        --local jsonbody = core.json.decode(res.body);
+        --ngx.log(ngx.WARN, "jsonbody ... " .. jsonbody)
 
-        local obj = { username = "" }
-        obj.username = base64_encode(jsonbody.data.realName)
-        return obj, nil
+        local encoded_body = base64_encode(res.body)
+        ngx.log(ngx.WARN, "encoded_body ... " .. encoded_body)
+        return encoded_body, nil
     end
-
-    --local obj, err = do_extract(authorization)
-    --if obj then
-    --    return obj.username, err
-    --    --return nil, obj.username
-    --else
-    --    return "none user", err
-    --    --return nil, "none user"
-    --end
 
     local matcher, err = lrucache(authorization, nil, do_extract, authorization)
     if matcher then
-        return matcher.username, err
+        return matcher, err
     else
         return "none user",  err
     end
@@ -150,13 +141,14 @@ function _M.rewrite(conf, ctx)
         return 401, { message = "Missing authorization in request" }
     end
 
-    local username, err = extract_auth_header(auth_header)
+    local encoded_body, err = extract_auth_header(auth_header)
     if err then
         return 401, { message = err }
     end
 
     --core.request.charset = "UTF-8"
-    core.request.set_header(ctx, "username", username)
+    core.request.set_header(ctx, "username", encoded_body)
+    ngx.log(ngx.WARN, "set header ... " .. encoded_body)
     core.log.info("hit axzo-auth access")
 end
 
