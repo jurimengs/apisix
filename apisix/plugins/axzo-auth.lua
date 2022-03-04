@@ -15,7 +15,7 @@
 -- limitations under the License.
 --
 local core = require("apisix.core")
-local http = require("apisix.core.resty.http")
+local http = require("resty.http")
 local ngx = ngx
 local ngx_re = require("ngx.re")
 local ipairs = ipairs
@@ -25,9 +25,6 @@ local tostring = tostring
 
 local lrucache = core.lrucache.new({
     ttl = 300, count = 512
-})
-local consumers_lrucache = core.lrucache.new({
-    type = "plugin",
 })
 
 local schema = {
@@ -41,34 +38,17 @@ local schema = {
     },
 }
 
-local consumer_schema = {
-    type = "object",
-    title = "work with consumer object",
-    properties = {
-        username = { type = "string" },
-        password = { type = "string" },
-    },
-    required = {"username", "password"},
-}
-
 local plugin_name = "axzo-auth"
 
 local _M = {
     version = 0.1,
-    priority = 2520,
-    type = 'auth',
+    priority = 2521,
     name = plugin_name,
-    schema = schema,
-    consumer_schema = consumer_schema
+    schema = schema
 }
 
 function _M.check_schema(conf, schema_type)
-    local ok, err
-    if schema_type == core.schema.TYPE_CONSUMER then
-        ok, err = core.schema.check(consumer_schema, conf)
-    else
-        ok, err = core.schema.check(schema, conf)
-    end
+    local ok, err = core.schema.check(schema, conf)
 
     if not ok then
         return false, err
