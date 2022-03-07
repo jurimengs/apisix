@@ -15,6 +15,7 @@
 -- limitations under the License.
 --
 local core = require("apisix.core")
+local plugin    = require("apisix.plugin")
 local http = require("resty.http")
 local ngx = ngx
 local ngx_re = require("ngx.re")
@@ -63,20 +64,17 @@ local function extract_auth_header(authorization, conf)
     local function do_extract(auth)
         local decoded = auth
         if not decoded then
-            return nil, "axzo-auth: Failed to decode authentication header: "
+            return nil, "axzo-auth: Failed to read authentication header "
         end
 
         local httpc = http.new()
         httpc:set_timeout(timeout)
 
-
         local authurl = conf.authurl
-
         if not authurl then
-            ngx.log(ngx.WARN,"failed to read authurl from conf ")
-            authurl = core.config.local_conf().authurl
+            local attr = plugin.plugin_attr("axzo-auth")
+            authurl = attr.authurl
         end
-        ngx.log(ngx.WARN," read authurl from conf ", authurl)
 
         if not authurl then
             return nil, "axzo-auth: config authurl first "
@@ -93,12 +91,15 @@ local function extract_auth_header(authorization, conf)
 
         if not res then
             ngx.log(ngx.WARN,"failed to request: ", err)
-            return nil, "axzo-auth: failed to request: " .. url .. "; errmsg : " .. err .. " ; auth : " .. decoded
+            return nil, "axzo-auth: failed to request: " .. url .. "; errmsg : " .. err
         end
         --请求之后，状态码
         ngx.status = res.status
         if ngx.status ~= 200 then
-            ngx.log(ngx.WARN,"非200状态，ngx.status:"..ngx.status)
+            if ngx.status == 401 then
+                return nil, "axzo-auth: Unauthorized "
+            end
+            ngx.log(ngx.WARN,"ngx.status:"..ngx.status)
             return nil, "axzo-auth: response : " .. res
         end
 
@@ -106,7 +107,6 @@ local function extract_auth_header(authorization, conf)
         --ngx.log(ngx.WARN, "jsonbody ... " .. jsonbody)
 
         local encoded_body = base64_encode(res.body)
-        ngx.log(ngx.WARN, "encoded_body ... " .. encoded_body)
         return encoded_body, nil
     end
 
@@ -137,7 +137,6 @@ function _M.rewrite(conf, ctx)
 
     --core.request.charset = "UTF-8"
     core.request.set_header(ctx, "userinfo", encoded_body)
-    ngx.log(ngx.WARN, "set header ... " .. encoded_body)
     core.log.info("hit axzo-auth access")
 end
 
