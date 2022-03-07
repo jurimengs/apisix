@@ -31,6 +31,8 @@ local schema = {
     type = "object",
     title = "work with route or service object",
     properties = {
+        discovery = {type = "string", minLength = 1, maxLength = 4096},
+        authurl = {type = "string", minLength = 1, maxLength = 4096},
         hide_credentials = {
             type = "boolean",
             default = false,
@@ -57,7 +59,7 @@ function _M.check_schema(conf, schema_type)
     return true
 end
 
-local function extract_auth_header(authorization)
+local function extract_auth_header(authorization, conf)
     local function do_extract(auth)
         local decoded = auth
         if not decoded then
@@ -68,7 +70,14 @@ local function extract_auth_header(authorization)
         httpc:set_timeout(timeout)
 
 
-        local authurl = core.config.local_conf().authurl
+        local authurl = conf.authurl
+
+        if not authurl then
+            ngx.log(ngx.WARN,"failed to read authurl from conf ")
+            authurl = core.config.local_conf().authurl
+        end
+        ngx.log(ngx.WARN," read authurl from conf ", authurl)
+
         if not authurl then
             return nil, "axzo-auth: config authurl first "
         end
@@ -121,13 +130,13 @@ function _M.rewrite(conf, ctx)
         return 401, { message = "Missing authorization in request" }
     end
 
-    local encoded_body, err = extract_auth_header(auth_header)
+    local encoded_body, err = extract_auth_header(auth_header, conf)
     if err then
         return 401, { message = err }
     end
 
     --core.request.charset = "UTF-8"
-    core.request.set_header(ctx, "username", encoded_body)
+    core.request.set_header(ctx, "userinfo", encoded_body)
     ngx.log(ngx.WARN, "set header ... " .. encoded_body)
     core.log.info("hit axzo-auth access")
 end
